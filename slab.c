@@ -195,7 +195,7 @@ void *slab_alloc(struct slab_chain *const sch)
         /* no empty or partial slabs available, create a new one */
         if (sch->slabsize <= slab_pagesize) {
             sch->partial = (struct slab_header*)mmap(NULL, sch->pages_per_alloc,
-                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
             if (UNLIKELY(sch->partial == MAP_FAILED))
                 return perror("mmap"), sch->partial = NULL;

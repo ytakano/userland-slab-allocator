@@ -29,13 +29,13 @@
 #define SLOTS_FIRST ((uint64_t) 1)
 #define FIRST_FREE_SLOT(s) ((size_t) __builtin_ctzll(s))
 #define FREE_SLOTS(s) ((size_t) __builtin_popcountll(s))
-#define ONE_USED_SLOT(slots, empty_slotmask) \
-    ( \
-        ( \
+#define ONE_USED_SLOT(slots, empty_slotmask)      \
+    (                                             \
+        (                                         \
             (~(slots) & (empty_slotmask))       & \
             ((~(slots) & (empty_slotmask)) - 1)   \
-        ) == SLOTS_ALL_ZERO \
-    )
+            ) == SLOTS_ALL_ZERO                   \
+        )
 
 #define POWEROF2(x) ((x) != 0 && ((x) & ((x) - 1)) == 0)
 
@@ -155,7 +155,11 @@ void *slab_alloc(struct slab_chain *const sch)
 
     if (LIKELY(sch->partial != NULL)) {
         /* found a partial slab, locate the first free slot */
+#ifdef __cplusplus
+        const size_t slot = FIRST_FREE_SLOT(sch->partial->slots);
+#else
         register const size_t slot = FIRST_FREE_SLOT(sch->partial->slots);
+#endif // __cplusplus
         sch->partial->slots ^= SLOTS_FIRST << slot;
 
         if (UNLIKELY(sch->partial->slots == SLOTS_ALL_ZERO)) {
@@ -190,8 +194,8 @@ void *slab_alloc(struct slab_chain *const sch)
     } else {
         /* no empty or partial slabs available, create a new one */
         if (sch->slabsize <= slab_pagesize) {
-            sch->partial = mmap(NULL, sch->pages_per_alloc,
-                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            sch->partial = (struct slab_header*)mmap(NULL, sch->pages_per_alloc,
+                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
 
             if (UNLIKELY(sch->partial == MAP_FAILED))
                 return perror("mmap"), sch->partial = NULL;
@@ -256,11 +260,16 @@ void slab_free(struct slab_chain *const sch, const void *const addr)
     assert(slab_is_valid(sch));
     assert(addr != NULL);
 
-    struct slab_header *const slab = (void *)
+    struct slab_header *const slab = (struct slab_header *const)
         ((uintptr_t) addr & sch->alignment_mask);
 
+#ifdef __cplusplus
+    const int slot = ((char *) addr - (char *) slab -
+        offsetof(struct slab_header, data)) / sch->itemsize;
+#else
     register const int slot = ((char *) addr - (char *) slab -
         offsetof(struct slab_header, data)) / sch->itemsize;
+#endif // __cplusplus
 
     if (UNLIKELY(slab->slots == SLOTS_ALL_ZERO)) {
         /* target slab is full, change state to partial */
@@ -303,7 +312,7 @@ void slab_free(struct slab_chain *const sch, const void *const addr)
                 const struct slab_header *const s;
             } s;
 
-            for (s.c = page; s.c != page_end; s.c += sch->slabsize) {
+            for (s.c = (const char *)page; s.c != page_end; s.c += sch->slabsize) {
                 if (UNLIKELY(s.s == sch->empty))
                     found_head = 1;
                 else if (UNLIKELY(s.s == slab))
@@ -587,7 +596,7 @@ int main(void)
     slab_init(&s, sizeof(double));
 
     for (size_t i = 0; i < sizeof(allocs) / sizeof(*allocs); i++) {
-        allocs[i] = slab_alloc(&s);
+        allocs[i] = (double *)slab_alloc(&s);
         assert(allocs[i] != NULL);
         *allocs[i] = i * 4;
         SLAB_DUMP;

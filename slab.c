@@ -25,10 +25,44 @@
 # define YELLOW(s) s
 #endif
 
+#define TZCNTQ(DST, SRC)        \
+    do {                        \
+        asm (                   \
+            "tzcntq %1, %0;"    \
+            : "=r" (DST)        \
+            : "r" (SRC)         \
+            );                  \
+    } while (0)
+
+#define POPCNTQ(DST, SRC)       \
+    do {                        \
+        asm (                   \
+            "popcntq %1, %0;"   \
+            : "=r" (DST)        \
+            : "r" (SRC)         \
+            );                  \
+    } while (0)
+
+uint64_t
+tzcntq(uint64_t num)
+{
+    uint64_t ret;
+    TZCNTQ(ret, num);
+    return ret;
+}
+
+uint64_t
+popcntq(uint64_t num)
+{
+    uint64_t ret;
+    POPCNTQ(ret, num);
+    return ret;
+}
+
 #define SLOTS_ALL_ZERO ((uint64_t) 0)
 #define SLOTS_FIRST ((uint64_t) 1)
-#define FIRST_FREE_SLOT(s) ((size_t) __builtin_ctzll(s))
-#define FREE_SLOTS(s) ((size_t) __builtin_popcountll(s))
+#define FIRST_FREE_SLOT(s) ((size_t) tzcntq(s))
+#define FREE_SLOTS(s) ((size_t) popcntq(s))
 #define ONE_USED_SLOT(slots, empty_slotmask)      \
     (                                             \
         (                                         \
